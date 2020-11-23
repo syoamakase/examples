@@ -1,11 +1,13 @@
 #!/bin/bash
 
 stage=-1
-stop_staGge=100
+stop_stage=100
+# For alignment for Fastspeech 2
+export CUDA_VISIBLE_DEVICES=0
 
 sampling_rate=16000
 wav_dir='wav_16kHz'
-mode='Transformer' # or Transformer
+mode='Transformer' # or FastSpeech 2 Transformer
 script_dir=script_${sampling_rate}
 
 echo ${script_dir}
@@ -56,10 +58,10 @@ if  [ ${stage} -le 2 ] && [ ${stop_stage} -ge 2 ]; then
 fi
 
 if  [ ${stage} -le 3 ] && [ ${stop_stage} -ge 3 ] && [ ${mode} = "FastSpeech2" ]; then
-    echo "Train CTC-based ASR model and get the alignment from it"
+    echo "Get the alignment from it"
     if [ ${sampling_rate} = "22050" ]; then
-        CUDA_VISIBLE_DEVICES=1 python tools/alignment/get_alignment.py --load_name /n/rd24/ueno/stable_version/ASR/checkpoints.LJSpeech_22.05kHz_ctc.phones/network.epoch25 --test_script data/train/${script_dir}/train_id_sort_xlen.txt
+        python tools/alignment/get_alignment.py --load_name tools/alignment/pretrained_models/checkpoints.LJSpeech_22.05kHz_ctc.phones/network.epoch25 --test_script data/train/${script_dir}/train_id_sort_xlen.txt
     else
-        CUDA_VISIBLE_DEVICES=1 python tools/alignment/get_alignment.py --load_name /n/rd24/ueno/stable_version/ASR/checkpoints.LJSpeech_16kHz_ctc.phones/network.epoch25 --test_script data/train/${script_dir}/train_id_sort_xlen.txt
+        python tools/alignment/get_alignment.py --load_name tools/alignment/pretrained_models/checkpoints.LJSpeech_16kHz_ctc.phones/network.epoch25 --test_script data/train/${script_dir}/train_id_sort_xlen.txt
     fi
 fi
