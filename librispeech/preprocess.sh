@@ -1,6 +1,6 @@
 #!/bin/bash
 
-stage=-1       # start from -1 if you need to start from data download
+stage=2       # start from -1 if you need to start from data download
 stop_stage=100
 
 # Set this to somewhere where you want to put your data, or where
@@ -12,8 +12,11 @@ datadir=/n/work2/ueno/data/librispeech/data
 # base url for downloads.
 data_url=www.openslr.org/resources/12
 
+
+wav_dir='wav'
+
 if [ ${stage} -le -1 ] && [ ${stop_stage} -ge -1 ]; then
-    echo "stage -1: Data Download"
+    echo "stage -1: Data download"
     for part in dev-clean test-clean dev-other test-other train-clean-100 train-clean-360 train-other-500; do
         local/download_and_untar.sh ${datadir} ${data_url} ${part}
     done
@@ -30,25 +33,32 @@ if [ ${stage} -le 0 ] && [ ${stop_stage} -ge 0 ]; then
 fi
 
 if [ ${stage} -le 1 ] && [ ${stop_stage} -ge 1 ]; then
-    echo "stage 1: Feature Extraction"
+    echo "stage 1: Convert flac into wav"
     mkdir -p tmp
 
-    for x in dev_clean test_clean train_clean_100 train_clean_360; do
-        cut -d ' ' -f 2 data/${x}/wav.scp > data/${x}/wavlist
-        python tools/extract_subdir.py data/${x}/wavlist data/${x}/${wav_dir} -n -2 | sed -e "s/^/mkdir -p /g" | bash
-        # TODO: downsample
-        python tools/make_convert_flac2wav.py data/${x}/wavlist --save_dir data/${x}/${wav_dir} -n -3 > tmp/convert_flac2wav.sh
+    for x in dev_clean; do #test_clean train_clean_100 train_clean_360 train_other_500; do
+        cut -d ' ' -f 6 data/${x}/wav.scp > data/${x}/flaclist
+        python tools/extract_subdir.py data/${x}/flaclist data/${x}/${wav_dir} -n -2 | sed -e "s/^/mkdir -p /g" | bash
+        python tools/make_convert_flac2wav.py data/${x}/flaclist --save_dir data/${x}/${wav_dir} -n -3 > tmp/convert_flac2wav.sh
         bash tmp/convert_flac2wav.sh
-        python preprocess.py --hp_file ${hparams_path} -d data/${x}/${wav_dir} --resume
+        cut -d ' ' -f 4 tmp/convert_flac2wav.sh > data/${x}/wavlist
     done
-    mkdir -p data/${dir_name}/wav.segment
-    cut -d ' ' data/${dir_name}/wav.scp -f 1 | sed -e "s/^/mkdir -p data\/${dir_name}\/wav.segment\//g" | bash
-    python tools/convert_kaldi2sox.py data/${dir_name}/segments data/${dir_name}/wav.scp data/${dir_name} > tmp/convert.sh
-    bash tmp/convert.sh
-    # make log mel-scale filter bank
-    cut -d ' ' -f 3 tmp/convert.sh > data/${dir_name}/wavlist
-    sed -e "s/wav\.segment/mel/g" -e "s/\.wav/\.htk/g" data/${dir_name}/wavlist > data/${dir_name}/mellist
-    cut -d ' ' data/${dir_name}/wav.scp -f 1 | sed -e "s/^/mkdir -p data\/${dir_name}\/mel\//g" | bash
-    paste -d ' ' data/${dir_name}/wavlist data/${dir_name}/mellist > tmp/scp.wav2mel
-    HCopy -C config/config.lmfb.40ch.static -S tmp/scp.wav2mel
+fi
+
+if [ ${stage} -le 2 ] && [ ${stop_stage} -ge 2 ]; then
+    echo "stage 2: Make log mel-scale filter bank"
+    for x in dev_clean; do #test_clean train_clean_100 train_clean_360 train_other_500; do
+        # make log mel-scale filter bank
+        sed -e "s/wav\//lmfb\//g" -e "s/\.wav/\.npy/g" data/${x}/wavlist > data/${x}/mellist
+        cut -d '/' data/${x}/mellist -f -12 | sed -e "s/^/mkdir -p /g" | bash
+        paste -d ' ' data/${x}/wavlist data/${x}/mellist > tmp/scp.wav2mel
+        python utils/wav2lmfb.py tmp/scp.wav2mel
+    done
+fi
+
+if [ ${stage} -le 3 ] && [ ${stop_stage} -ge 3 ]; then
+    echo "stage 3: Text preparation"
+    for x in dev_clean test_clean train_clean_100 train_clean_360; do
+        python tools/lower_word.py data/${x}/text > data/${x}/text.lower
+    done
 fi

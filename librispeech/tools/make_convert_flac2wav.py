@@ -9,7 +9,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     wavlist = args.wavlist
     save_dir = args.save_dir
-    sampling_rate = args.sampling_rate
+    #sampling_rate = args.sampling_rate
     num_subdir = args.num_subdir
 
     with open(wavlist) as f:
@@ -19,6 +19,6 @@ if __name__ == '__main__':
             save_name = wf.split('/')[num_subdir:]
             save_name = '/'.join(save_name)
             save_path = os.path.join(save_dir, save_name)
-            save_path = os.path.abspath(save_path)
+            save_path = os.path.abspath(save_path).replace('.flac', '.wav')
             # very high option
             print(f'ffmpeg -i {wf} {save_path}')
